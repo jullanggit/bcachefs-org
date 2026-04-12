@@ -22,3 +22,7 @@ check if it compiles - `make W=1 O=out -j (nproc) fs/bcachefs/`
 Until now more useful as some of the tests are quite flaky, and might even have multiple different errors that might occur.
 This command runs the test(s) in a loop until interrupted. Wait for a number of iterations that seems appropriate.
 `./build-test-kernel run -R -I -K -k ../bcachefs tests/fs/bcachefs/shrink.ktest`
+
+## Notes
+### bcachefs
+- `bch2_write_super()` copies the filesystem-global superblock (`c->disk_sb.sb`) onto per-device superblocks before writing them, except for single-device fields like journal buckets. If you want a non-journal superblock change to persist, update `c->disk_sb.sb`, not just `ca->disk_sb.sb`.
