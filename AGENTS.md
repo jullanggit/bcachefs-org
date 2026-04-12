@@ -17,4 +17,5 @@ after both of the commands below the test name(s) to run can be specified, if on
 #### multi-run
 Until now more useful as some of the tests are quite flaky, and might even have multiple different errors that might occur.
 This command runs the test(s) in a loop until interrupted. Wait for a number of iterations that seems appropriate.
+Remember to stop this after you've got the information you wanted.
 `./build-test-kernel run -R -I -K -k ../bcachefs tests/fs/bcachefs/shrink.ktest`
