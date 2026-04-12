@@ -5,6 +5,7 @@ When editing the bcachefs source, you do not have to update the userspace mirror
 Whenever you discover something that would be good to have in this AGENTS.md file, add it.
 
 Always describe your changes and make them understandable to me after you're done.
+Document anything tricky or noteworthy directly in the code. The end goal of these changes is to get merged into mainline, any aid in understandability is good.
 
 ## Commands
 ### general
