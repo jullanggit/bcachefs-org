@@ -7,6 +7,8 @@ Whenever you discover something that would be good to have in this AGENTS.md fil
 Always describe your changes and make them understandable to me after you're done.
 Document anything tricky or noteworthy directly in the code. The end goal of these changes is to get merged into mainline, any aid in understandability is good.
 
+After you're done with your changes, a (or multiple) commit(s) with messanges (with further body if neccessary) describing your changes.
+
 ## Commands
 ### general
 Use jj for version control, commit whenever you find it appropriate, you can also rewrite the history of your _own_ commits if you find it approriate.
