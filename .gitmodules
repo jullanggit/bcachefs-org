@@ -1,9 +1,9 @@
 [submodule "ktest"]
 	path = ktest
-	url = git@github.com:jullanggit/ktest.git
+	url = https://github.com/jullanggit/ktest.git
 [submodule "bcachefs"]
 	path = bcachefs
-	url = git@github.com:jullanggit/bcachefs.git
+	url = https://github.com/jullanggit/bcachefs.git
 [submodule "bcachefs-tools"]
 	path = bcachefs-tools
-	url = git@github.com:jullanggit/bcachefs-tools.git
+	url = https://github.com/jullanggit/bcachefs-tools.git
