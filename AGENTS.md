@@ -4,7 +4,7 @@ When editing the bcachefs source, you do not have to update the userspace mirror
 
 Whenever you discover something that would be good to have in this AGENTS.md file, add it.
 
-Always describe your changes and make them understandable to me after you're done.
+Always describe your changes and make them understandable to me after you're done. Explain in detail with reasoning for why you made these changes.
 Document anything tricky or noteworthy directly in the code. The end goal of these changes is to get merged into mainline, any aid in understandability is good.
 
 After you're done with your changes, a (or multiple) commit(s) with messanges (with further body if neccessary) describing your changes. Unlike your description in the chat, these should not be targeted at me, but the upstream maintainer. Please do split out logically separate changes into multiple commits, make them as easy to review as possible.
