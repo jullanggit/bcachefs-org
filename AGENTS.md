@@ -11,7 +11,7 @@ After you're done with your changes, a (or multiple) commit(s) with messanges (w
 
 ## Commands
 ### general
-Use jj for version control, commit whenever you find it appropriate, you can also rewrite the history of your _own_ commits if you find it approriate.
+Use jj for version control, commit whenever you find it appropriate, you can also rewrite the history of your _own_ commits if you find it appropriate.
 Keep the commit title on the first line; put any extended explanation in the commit body after a blank line.
 The kernel source is a separate repo in `bcachefs/`; run `jj` there when checking status or committing kernel changes.
 ### bcachefs
