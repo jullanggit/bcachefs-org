@@ -19,7 +19,7 @@ check if it compiles - `make W=1 O=out -j (nproc) fs/bcachefs/`
 ### ketst
 - run shrink tests
 - after both of the commands below the test name(s) to run can be specified, if only some of them should be run. For this, strip the test_ prefix from the test name. (./build-test-kernel run ... online_two_device_data_shrink)
-- remember to stop the process(es) after you've got the information you wanted, as -I (and -R) keeps them alive until explicitly stopped.
+- remember to _always_ stop the process(es) after you've got the information you wanted, as -I (and -R) keeps them alive until explicitly stopped, and they eat up a lot of memory, potentially crashing the system.
 #### single-run
 `./build-test-kernel run -I -K -k ../bcachefs tests/fs/bcachefs/shrink.ktest`
 #### multi-run
