@@ -26,6 +26,7 @@ check if it compiles - `make W=1 O=out -j (nproc) fs/bcachefs/`
 Until now more useful as some of the tests are quite flaky, and might even have multiple different errors that might occur.
 This command runs the test(s) in a loop until interrupted. Wait for a number of iterations that seems appropriate. For final confirmations, at least four times.
 `./build-test-kernel run -R -I -K -k ../bcachefs tests/fs/bcachefs/shrink.ktest`
+- when adding or changing shrink ktests, prefer an explicit remount after `fsck` with the full member-device list. Resize/shrink changes both allocator state and per-device superblocks, and the remount catches reopen regressions that a clean `fsck` alone can miss.
 
 ## Notes
 ### bcachefs
