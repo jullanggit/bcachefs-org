@@ -24,7 +24,7 @@ check if it compiles - `make W=1 O=out -j (nproc) fs/bcachefs/`
 `./build-test-kernel run -I -K -k ../bcachefs tests/fs/bcachefs/shrink.ktest`
 #### multi-run
 Until now more useful as some of the tests are quite flaky, and might even have multiple different errors that might occur.
-This command runs the test(s) in a loop until interrupted. Wait for a number of iterations that seems appropriate.
+This command runs the test(s) in a loop until interrupted. Wait for a number of iterations that seems appropriate. For final confirmations, at least four times.
 `./build-test-kernel run -R -I -K -k ../bcachefs tests/fs/bcachefs/shrink.ktest`
 
 ## Notes
