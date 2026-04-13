@@ -32,3 +32,4 @@ This command runs the test(s) in a loop until interrupted. Wait for a number of 
 ### bcachefs
 - `bch2_write_super()` copies the filesystem-global superblock (`c->disk_sb.sb`) onto per-device superblocks before writing them, except for single-device fields like journal buckets. If you want a non-journal superblock change to persist, update `c->disk_sb.sb`, not just `ca->disk_sb.sb`.
 - `BTREE_ID_backpointers` keys are in device+sector space, not device+bucket space. When a shrink cutoff starts in bucket coordinates, translate it before touching backpointer ranges.
+- Shrink can need fresh metadata allocations before reconcile has moved any data. If `metadata_target`/`foreground_target` only points at the device being shrunk, internal metadata writes such as reconcile scan cookies, btree rewrites, and journal buckets need a spill-to-anywhere fallback or the shrink can deadlock on `no_buckets_found` before evacuation starts.
