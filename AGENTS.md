@@ -19,13 +19,18 @@ check if it compiles - `make W=1 O=out -j (nproc) fs/bcachefs/`
 ### ketst
 - run shrink tests
 - after both of the commands below the test name(s) to run can be specified, if only some of them should be run. For this, strip the test_ prefix from the test name. (./build-test-kernel run ... online_two_device_data_shrink)
-- remember to _always_ stop the process(es) after you've got the information you wanted, as -I (and -R) keeps them alive until explicitly stopped, and they eat up a lot of memory, potentially crashing the system.
 #### single-run
-`./build-test-kernel run -I -K -k ../bcachefs tests/fs/bcachefs/shrink.ktest`
+`./build-test-kernel run -K -k ../bcachefs tests/fs/bcachefs/shrink.ktest`
+#### until failure
+This command runs the test(s) in a loop until a failure is encountered. Wait for a number of iterations that seems appropriate. For final confirmations, at least four times.
+`./build-test-kernel run -L -K -k ../bcachefs tests/fs/bcachefs/shrink.ktest`
+- remember to _always_ stop the process(es) after you've got the information you wanted, as -R keeps them alive until explicitly stopped, and they eat up a lot of memory, potentially crashing the system.
 #### multi-run
 Until now more useful as some of the tests are quite flaky, and might even have multiple different errors that might occur.
-This command runs the test(s) in a loop until interrupted. Wait for a number of iterations that seems appropriate. For final confirmations, at least four times.
-`./build-test-kernel run -R -I -K -k ../bcachefs tests/fs/bcachefs/shrink.ktest`
+This command runs the test(s) in a loop until interrupted, continuing after failures. This is mainly useful, if there are multiple errors, if you want to confirm you fixed one of them.
+`./build-test-kernel run -R -K -k ../bcachefs tests/fs/bcachefs/shrink.ktest`
+- remember to _always_ stop the process(es) after you've got the information you wanted, as -R keeps them alive until explicitly stopped, and they eat up a lot of memory, potentially crashing the system.
+#### general
 - when adding or changing shrink ktests, prefer an explicit remount after `fsck` with the full member-device list. Resize/shrink changes both allocator state and per-device superblocks, and the remount catches reopen regressions that a clean `fsck` alone can miss.
 
 ## Notes
