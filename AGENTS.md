@@ -33,6 +33,8 @@ This command runs the test(s) in a loop until interrupted, continuing after fail
 - remember to _always_ stop the process(es) after you've got the information you wanted, as -R keeps them alive until explicitly stopped, and they eat up a lot of memory, potentially crashing the system.
 #### general
 - when adding or changing shrink ktests, prefer an explicit remount after `fsck` with the full member-device list. Resize/shrink changes both allocator state and per-device superblocks, and the remount catches reopen regressions that a clean `fsck` alone can miss.
+#### ssh
+You can run `./build-test-kernel ssh` to ssh into a running test instance and inspect it.
 
 ## Notes
 ### bcachefs
