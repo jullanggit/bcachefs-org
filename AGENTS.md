@@ -34,6 +34,7 @@ This command runs the test(s) in a loop until interrupted, continuing after fail
 #### general
 - when adding or changing shrink ktests, prefer an explicit remount after `fsck` with the full member-device list. Resize/shrink changes both allocator state and per-device superblocks, and the remount catches reopen regressions that a clean `fsck` alone can miss.
 - `build-test-kernel -B <dir>` can reuse another kernel `O=` tree, but only when both trees were built under a compatible userspace/toolchain. Mixing build dirs across different devshell/glibc revisions can break host tools such as `objtool` or `extract-cert`; if that happens, fall back to a fresh per-ktest build dir.
+- For larger Rust-based filesystem stress/property tests, keep `ktest` as the outer VM/device harness and run the Rust controller inside the guest from a `.ktest` wrapper. Replacing `ktest` would duplicate scratch-device provisioning, guest lifecycle handling, and log collection.
 #### ssh
 You can run `./build-test-kernel ssh` to ssh into a running test instance and inspect it.
 
