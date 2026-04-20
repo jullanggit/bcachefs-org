@@ -40,6 +40,7 @@ You can run `./build-test-kernel ssh` to ssh into a running test instance and in
 
 ## Notes
 ### bcachefs
+- `SHRINK_SPEC.md` is the top-level reference for current shrink behavior and implementation details. The large overview comment in `bcachefs/fs/bcachefs/init/dev.c` still lags the current shrink work, so update the spec when shrink semantics or ordering change.
 - `bch2_write_super()` copies the filesystem-global superblock (`c->disk_sb.sb`) onto per-device superblocks before writing them, except for single-device fields like journal buckets. If you want a non-journal superblock change to persist, update `c->disk_sb.sb`, not just `ca->disk_sb.sb`.
 - Pending shrink state is persisted in each member's `target_nbuckets`. If a shrink is interrupted after that field is written, remounting read-write should resume the shrink from mount/recovery rather than requiring the ioctl to be reissued.
 - Filesystem-owned resize workers must be stopped before `bch2_fs_read_only()` reaches clean shutdown. Otherwise a persisted resize can keep issuing transactional alloc/accounting updates during unmount and trip write-path assertions after the filesystem has started going read-only.
