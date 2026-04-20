@@ -246,17 +246,17 @@ Shrink does not fail after a small fixed number of passes. It tracks:
 - the current head bucket and first backpointer
 - total backpointer count in the tail
 - whether the latest no-progress pass actually completed a reconcile kick
-- whether the journal advanced during that pass TODO: why?
+- whether the journal advanced during that pass
 - whether the pass included a fresh device scan
 
 The current heuristic is:
 
 - progress resets the stall counter
-- if the journal moved, assume the tail's blockers are still changing and rescan
+- if the journal moved, assume the tail's blockers are still changing and rescan from the current cutoff instead of treating the tail as impossible
 - if a no-progress pass did not include a device scan, force one
 - only after repeated no-progress full scans on a journal-quiescent state does shrink declare `-ENOSPC`
 
-The current limit is `32` stalled kicks.
+The current limit is `32` stalled full rescans.
 
 On `-ENOSPC`, shrink calls `bch2_dev_shrink_clear_target()` before returning. That clears `target_nbuckets` back to idle so allocations are no longer blocked past the old cutoff.
 
