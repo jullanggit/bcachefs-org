@@ -25,7 +25,7 @@ This is a description of the code as it exists now, not a proposal for a differe
 - `tail`: the region `[target_nbuckets, nbuckets)`.
 - `normalized target`: `target_nbuckets ?: nbuckets`.
 
-Most of the code uses the normalized target, not the raw on-disk field. `target_nbuckets == 0` is only an idle sentinel on disk.
+Most of the code uses the normalized target, not the raw on-disk field. `target_nbuckets == 0` is only an idle sentinel on disk, that exists for kernel-upgrade compatibility.
 
 ## State Model
 
@@ -38,8 +38,7 @@ Each member stores both the committed size and the requested size in the superbl
 
 Current semantics are:
 
-- `target_nbuckets == 0`: idle
-- `target_nbuckets == nbuckets`: also idle
+- `target_nbuckets == 0` and  `target_nbuckets == nbuckets`: idle
 - `target_nbuckets < nbuckets`: shrink requested or in progress
 - `target_nbuckets > nbuckets`: grow requested or in progress
 
@@ -119,13 +118,15 @@ Current hooks are:
 - `bcachefs/fs/bcachefs/data/extents.c`
   - cached pointers past the cutoff are treated as stale and dropped.
 - `bcachefs/fs/bcachefs/alloc/discard.c`
-  - discard skips buckets in the truncating tail.
+  - discard skips buckets in the truncating tail. TODO: document why
 - `bcachefs/fs/bcachefs/journal/write.c`
   - journal allocation falls back to the full filesystem if the preferred metadata target consists entirely of shrinking devices.
+    - TODO: see if this can be tightened to only fall back if no journal allocations can be made on the device (not just blindly check if its shrinking. (This might already be the case, if so, document it.))
 - `bcachefs/fs/bcachefs/btree/interior.c`
-  - btree metadata allocation has the same spill-to-anywhere fallback.
+  - btree metadata allocation has the same spill-to-anywhere fallback. TODO: same as above
 - `bcachefs/fs/bcachefs/data/reconcile/work.c`
   - device reconcile scans start at the shrink cutoff in backpointer key space instead of rescanning the whole device.
+    - TODO: see if this is too general. It should only affect scans triggered by shrink, not all scans. This might or might not be an issue.
 
 Those checks are what make the shrink cutoff effective as soon as the request is persisted. They also mean retargeting away from shrink must flip behavior immediately via the normalized helpers.
 
@@ -139,6 +140,7 @@ Those checks are what make the shrink cutoff effective as soon as the request is
 It then does one of three things:
 
 - `target == nbuckets`: nothing to do
+  - TODO: reverse any effects that might still linger from shrink (for example discard delays? maybe these can also be handled more cleanly)
 - `target > nbuckets`: call `__bch2_dev_grow()`
 - `target < nbuckets`: call `__bch2_dev_shrink()`
 
@@ -175,7 +177,7 @@ This matters because shrink later defers discards in the tail to avoid deadlocks
 
 `move_journal_past_cutoff()` runs before the main tail-drain loop.
 
-The journal is handled explicitly because journal buckets are not something shrink should wait for reconcile to discover and evacuate indirectly. The helper:
+The journal is handled explicitly because journal buckets are not something shrink should wait for reconcile to discover and evacuate indirectly. (TODO: maybe this should actually be handled by reconcile?) The helper:
 
 - counts journal buckets at or beyond the cutoff
 - temporarily grows the journal if more buckets are needed to relocate
@@ -215,6 +217,8 @@ The loop first does a cheap head snapshot. If the tail looks empty, it flushes t
 
 The helper scans alloc keys in the tail for cached buckets that are not currently open, then invalidates the matching backpointers directly. This lets shrink wait only on durable data and metadata that still genuinely pins the tail.
 
+TODO: maybe the reconcile helper that actually moves the data can be changed to not leave behind cached copies on move, if they are in the tail.
+
 #### Reconcile kick
 
 After each snapshot, shrink queues reconcile work with `bch2_dev_shrink_queue_reconcile()`:
@@ -242,7 +246,7 @@ Shrink does not fail after a small fixed number of passes. It tracks:
 - the current head bucket and first backpointer
 - total backpointer count in the tail
 - whether the latest no-progress pass actually completed a reconcile kick
-- whether the journal advanced during that pass
+- whether the journal advanced during that pass TODO: why?
 - whether the pass included a fresh device scan
 
 The current heuristic is:
@@ -267,7 +271,7 @@ The finalization order is important:
 3. Flush outstanding journal pins and then device-specific pins.
 4. Flush the journal.
 5. Recheck that the tail is really empty.
-6. Clear `need_discard` entries for truncated tail buckets.
+6. Clear `need_discard` entries for truncated tail buckets. TODO: maybe this should bedone before the emptiness check?
 7. Drop superblock copies whose offsets are beyond the cutoff.
 8. Truncate accounting with `bch2_dev_truncate_accounting()`.
 9. Remove alloc metadata for the tail with `bch2_dev_remove_alloc()`.
@@ -277,12 +281,12 @@ The finalization order is important:
 
 Several points here are easy to get wrong:
 
-- Shrink waits only for pins that were already outstanding when finalization begins. Waiting for all future pins can turn shrink into an unbounded global journal drain.
+- Shrink waits only for pins that were already outstanding when finalization begins. Waiting for all future pins can turn shrink into an unbounded global journal drain. TODO: it does also flush device pins, not only after tail. Maybe implement a more specific flush tail pins function? Generally, document more why flushing pins is even necessary (and what pins are, but thats just for me, not to be documented here if its clear).
 - `need_discard` cleanup must scan and filter by decoded bucket because `BTREE_ID_need_discard` is keyed by `(journal seq, encoded bucket)`, not by raw `(dev, bucket)`.
 - Superblock copies are not discovered via the backpointer walk; `drop_sbs_after_cutoff()` handles them explicitly before the committed size changes.
 - Alloc metadata is removed before the new smaller `nbuckets` becomes visible, so later transactions cannot see stale tail buckets after commit.
 
-There is still a code comment in finalization about whether any of the grow-side `__bch2_dev_resize_alloc()` work should eventually have a shrink-side equivalent. The current shrink implementation does not call it.
+There is still a code comment in finalization about whether any of the grow-side `__bch2_dev_resize_alloc()` work should eventually have a shrink-side equivalent. The current shrink implementation does not call it. TODO: that code can probably be removed
 
 ## Final Commit Invariant
 
@@ -344,7 +348,7 @@ Reconcile is the mechanism that rediscovers and moves tail references, but shrin
 
 ### Discard
 
-Discard work is restricted so it does not race the evacuation path on the truncating tail. Once resize finishes, `bch2_dev_resize_finish()` restarts async discards.
+Discard work is restricted so it does not race the evacuation path on the truncating tail. Once resize finishes, `bch2_dev_resize_finish()` restarts async discards. TODO: see how much discard blocking is necessary and why these two subsystems even collide.
 
 ## Known Performance/Behavioral Properties
 
