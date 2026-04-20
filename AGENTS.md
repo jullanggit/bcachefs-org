@@ -9,7 +9,7 @@ Document anything tricky or noteworthy directly in the code. The end goal of the
 
 After you're done with your changes, a (or multiple) commit(s) with messanges (with further body if neccessary) describing your changes. Unlike your description in the chat, these should not be targeted at me, but the upstream maintainer. Please do split out logically separate changes into multiple commits, make them as easy to review as possible.
 
-Document any algorithmic or relevant implementation-wise changes in SHRINK_SPEC.md. This document should always be in-sync with the actual implementation. As such, before implementing anything, first read it to avoid having to peace together everything on every run. If you discover any inaccuracies in the spec, or things that should be documented in it, also amend it even if it is unrelated to your changes.
+Document any algorithmic or relevant implementation-wise changes in SHRINK_SPEC.md. This document should always be in-sync with the actual implementation. As such, *before implementing anything, first read SHRINK_SPEC.md* to avoid having to peace together everything on every run. If you discover any inaccuracies in the spec, or things that should be documented in it, also amend it even if it is unrelated to your changes.
 The spec is generally intended to be descriptive, not prescriptive. Whenever known upfront, document you intended changes in the spec before implementing them, and update the spec when plans change.
 
 ## Commands
