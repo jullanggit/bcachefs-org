@@ -258,6 +258,10 @@ The current heuristic is:
 
 The current limit is `32` stalled full rescans.
 
+This journal-based quiescence check is conservative but not shrink-local. `journal_cur_seq()` is filesystem-global, so unrelated metadata-writing IO elsewhere in the filesystem can keep suppressing the stall counter even when the shrink tail itself is not changing. In the worst case, an impossible shrink can keep retrying indefinitely under enough unrelated write churn.
+
+The intended follow-up is to replace the filesystem-global journal signal with a shrink-local churn signal that only tracks changes relevant to the tail blockers being evacuated.
+
 On `-ENOSPC`, shrink calls `bch2_dev_shrink_clear_target()` before returning. That clears `target_nbuckets` back to idle so allocations are no longer blocked past the old cutoff.
 
 ### Phase 4: Finalize The Shrink
