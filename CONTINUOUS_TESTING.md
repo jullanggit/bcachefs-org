@@ -100,7 +100,7 @@ The model should classify requested shrinks into:
 
 Only the first two classes get hard outcome assertions. The `Unknown` class is still useful for stress, but should not produce false failures.
 
-The same applies to non-resize topology changes. For example, in an initially single-device filesystem, removing the original seed device after later `device add` operations is not obviously in the `ClearlyPossible` bucket just because another member exists. The first implementation should keep remove assertions conservative and only hard-assert cases that are obviously evacuable from the observed state.
+The same applies to non-resize topology changes. `bcachefs device remove` is not the operation that evacuates a live member; it removes a member after evacuation has completed. The continuous harness should therefore follow the real workflow for hard-success remove cases: `bcachefs device evacuate <dev>`, wait for it to complete, then `bcachefs device remove ...`. Remove should only be expected to fail once evacuation itself cannot move the remaining state elsewhere.
 
 ### Invariants And Checkpoints
 After selected operations, and always at the end of a run, check:
