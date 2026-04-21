@@ -72,16 +72,22 @@ Current agreed axes:
 - encryption on/off
 - compression off or `zstd:1`
 - per-device bucket size randomly chosen from a sensible fixed set
-- per-device label randomly chosen from:
-  - `foreground`
-  - `background`
 
 Deliberately not a format-time axis:
 - initial member count
+- device labels
+- foreground/background/promote targets
 
 Instead, the filesystem should start with the minimum number of devices required by the chosen redundancy mode. Topology growth and shrink after that belong to the runtime manager.
 
-Targets should be set independently of whether they currently match any device labels. A target that points at no current devices is still useful state, because later device additions or relabeling can make it become active.
+Labels and targets should be shifted into the runtime manager. This keeps startup profiles simpler and lets the harness exercise delayed-effect configurations over time instead of baking them in at format.
+
+Targets should still be set independently of whether they currently match any device labels. A target that points at no current devices is still useful state, because later device additions or relabeling can make it become active.
+
+Current implementation note:
+- the current bcachefs target parser does not accept arbitrary future labels; runtime target changes only accept an existing device or an existing disk-group label at the time of the change
+- if the harness eventually wants to exercise unresolved future targets, that requires a bcachefs behavior change rather than just more userspace harness logic
+- until then, the continuous harness should only generate `SetTarget` operations for labels that currently exist on at least one active device
 
 ### Controller Responsibilities
 - manage one event loop that launches and polls asynchronous operations
@@ -128,6 +134,7 @@ For the initial design:
 - labels only need to cover `foreground` and `background`
 - only one worker instance per stress type should exist at a time
 - worker operations are best modeled as toggles rather than separate start/stop enums
+- when labels or targets are currently unset, the manager should be more likely to issue the operations that set them
 
 ### Weighted Selection
 Runtime operations should be selected randomly, but not necessarily uniformly.
