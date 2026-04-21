@@ -20,6 +20,19 @@ That does not mean it can be sloppy about oracles. The harness still needs to be
 - prefer conservative assertions that remain stable under long runs and future background workloads
 - record enough context that rare failures are replayable instead of one-off ghosts
 
+## Agreed Design
+The continuous harness should not replay the existing explicit shrink tests as scripts. Instead, it should absorb their dimensions into one long-running randomized system that explores combinations over many runs.
+
+The basic structure is:
+- one manager thread
+- asynchronous operations by default
+- long-lived background stress workers that can be toggled on and off
+- observation-driven outcome checking
+- randomized format-time choices at startup
+- randomized runtime choices over the lifetime of the filesystem
+
+The aim is to cover at least the same space as the current explicit tests, but through combinations and overlap rather than one hand-written scenario per test.
+
 ## Manager Loop
 The harness should use one manager thread, not a sequential property-test driver.
 
@@ -50,6 +63,26 @@ An explicit model can still exist, but only as a helper for operation legality o
 ## Rust Harness Sketch
 The test harness should be a Rust controller with a small amount of internal bookkeeping and a set of long-lived background workers.
 
+### Format-Time Randomization
+Each case starts by randomly choosing a valid format-time profile.
+
+Current agreed axes:
+- replication level in `[1, 3]`
+- erasure coding on/off, but only when valid for the chosen redundancy level
+- encryption on/off
+- compression off or `zstd:1`
+- per-device bucket size randomly chosen from a sensible fixed set
+- per-device label randomly chosen from:
+  - `foreground`
+  - `background`
+
+Deliberately not a format-time axis:
+- initial member count
+
+Instead, the filesystem should start with the minimum number of devices required by the chosen redundancy mode. Topology growth and shrink after that belong to the runtime manager.
+
+Targets should be set independently of whether they currently match any device labels. A target that points at no current devices is still useful state, because later device additions or relabeling can make it become active.
+
 ### Controller Responsibilities
 - manage one event loop that launches and polls asynchronous operations
 - maintain enough bookkeeping to know which requests are current or superseded
@@ -78,19 +111,34 @@ Each worker should have:
 
 ### Managed Operations
 Likely operation set:
-- `StartWorker(WorkerSpec)`
-- `StopWorker(WorkerId)`
 - `Resize { dev, target, mode }`
 - `AddDevice { dev }`
 - `RemoveDevice { dev }`
-- `SetReplication { data, metadata }`
-- `CreateSnapshot { src, dst }`
-- `DeleteSnapshot { path }`
-- `Wait { ms }`
+- `SetTarget { kind, label }`
+- `SetDeviceLabel { dev, label }`
+- `ToggleRandrw`
+- `ToggleFileChurn`
+- `ToggleSnapshotChurn`
 
 The important point is that controller operations stay coarse-grained and semantically meaningful. The manager should not devolve into emitting raw shell commands as its primary abstraction.
 
 Managed operations should be actual filesystem mutations, not assertions. Checks such as remounts, offline `fsck`, and usage sampling belong in the assertion/checkpoint layer that runs around selected operations and at case boundaries.
+
+For the initial design:
+- labels only need to cover `foreground` and `background`
+- only one worker instance per stress type should exist at a time
+- worker operations are best modeled as toggles rather than separate start/stop enums
+
+### Weighted Selection
+Runtime operations should be selected randomly, but not necessarily uniformly.
+
+Weighted selection is useful because some important states are under-sampled by naive uniform random choices. In particular, the harness should be willing to bias toward:
+- overlapping resizes on the same device
+- target changes and label changes
+- operations under active background stress
+- harder or rarer topology states
+
+Bias should be introduced only where ordinary randomized running would likely not hit important cases often enough.
 
 ### Bookkeeping
 Internal bookkeeping should track only what is needed to launch legal operations and reason about supersession:
@@ -102,6 +150,13 @@ Internal bookkeeping should track only what is needed to launch legal operations
 - a conservative free-space estimate
 - snapshot count / pinned-space estimate
 - current replication policy
+
+For the first implementation, the bookkeeping does not need to be a deep reference model. It mainly needs to know:
+- which devices currently exist and are active
+- the most recent requested resize per device
+- which resizes have been superseded
+- which stress workers are currently enabled
+- the current target and label configuration
 
 For resize-oracle purposes, requested shrinks should still be classified into:
 - `ClearlyPossible`
@@ -127,6 +182,13 @@ Useful checkpoint policy:
 - heavier checks only when the manager has drained in-flight work
 - full `fsck` and remount before declaring success
 - start each case from a freshly prepared filesystem state so later cases do not inherit stale topology or usage state
+
+Runtime state generation should mostly happen inside the manager loop, not as a separate startup fixture phase. The same long-running case that resizes and retargets devices should also be able to:
+- write and overwrite data
+- build metadata-heavy trees
+- create and delete snapshots
+- flip labels and targets
+- run with stress workers enabled
 
 ## Logging And Replay
 The framework should produce:
@@ -176,8 +238,9 @@ If needed later, a host-only smoke mode could exist for faster local iteration w
 ## Practical Shape
 Initial version:
 - one `.ktest` test case that formats a filesystem, mounts it, and runs the Rust controller once
-- controller starts a small set of background workers
-- manager launches resize and topology operations over time, allowing overlap where the oracle can still reason about the result
+- controller randomly chooses a valid format-time profile at startup
+- manager launches resize, topology, label, target, and worker-toggle operations over time
+- overlap is allowed where the oracle can still reason about the result, especially for superseding resizes
 - end-of-run always does worker shutdown, unmount, offline `fsck`, and remount
 
 Later extensions:
