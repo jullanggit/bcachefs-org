@@ -20,48 +20,43 @@ That does not mean it can be sloppy about oracles. The harness still needs to be
 - prefer conservative assertions that remain stable under long runs and future background workloads
 - record enough context that rare failures are replayable instead of one-off ghosts
 
-## Proptest Fit
-`proptest` is a good fit for this framework, with one important caveat: it should generate the controller's operation sequence, not try to model the kernel's scheduler.
+## Manager Loop
+The harness should use one manager thread, not a sequential property-test driver.
 
-That means:
-- the generated test case is a sequential control plan
-- the harness itself creates real overlap by leaving background workers running while later operations execute
-- shrinking still works on the operation history, even though the exact runtime interleaving remains nondeterministic
+The manager's job is:
+- snapshot the relevant live filesystem state
+- decide which operation to launch next
+- launch operations asynchronously
+- keep multiple operations in flight at once
+- inspect completions against expectations derived from:
+  - the state before launch
+  - the state after completion
+  - which other operations were already in flight
+  - which newer operations superseded older ones
 
-This matches the intended design of:
-- one synchronous controller thread
-- multiple asynchronous/background activities that stay live across controller steps
+This is a better fit for resize semantics such as:
+- newer resize requests canceling or superseding older ones
+- long-running operations overlapping realistic filesystem activity
+- expectations that depend on more than a single pure transition function
 
-`proptest-state-machine` is a plausible starting point because the test naturally has:
-- an abstract reference model
-- generated transitions
-- invariants that should hold after every controller step
-
-Current limitation:
-- `proptest-state-machine` is sequential-only, so it will not systematically explore thread schedules
-
-That is acceptable here as long as the framework is explicit that:
-- `proptest` explores operation histories
-- background worker timing is treated as a stress dimension, not as a fully modeled state-space dimension
-
-For outcome checking, the better pattern is:
-- snapshot the relevant live filesystem state before each operation
+The oracle should stay observation-driven:
+- snapshot the relevant live filesystem state before launch
 - derive the expected result from that observation plus the requested operation
-- apply the operation
-- snapshot again and compare against the expected outcome
+- let the operation run concurrently with other in-flight work
+- when it completes, snapshot again and compare against the expected outcome
 
-The model can stay minimal and conservative. It is still useful for generating legal operation sequences, but it should not try to be the primary oracle once free-space, snapshots, or replication semantics become too rich to mirror faithfully.
+An explicit model can still exist, but only as a helper for operation legality or bookkeeping. It should not be the primary oracle once free-space, snapshots, replication, or concurrent supersession semantics become too rich to mirror faithfully.
 
-## Rust Model Sketch
-The test harness should be a Rust controller with a small state model and a set of long-lived background workers.
+## Rust Harness Sketch
+The test harness should be a Rust controller with a small amount of internal bookkeeping and a set of long-lived background workers.
 
 ### Controller Responsibilities
-- generate operations with `proptest`
-- maintain the reference model
+- manage one event loop that launches and polls asynchronous operations
+- maintain enough bookkeeping to know which requests are current or superseded
 - start and stop background workers
-- issue synchronous foreground operations
-- classify outcomes as expected success, expected failure, or unknown
-- run checkpoints and invariant validation
+- classify outcomes as expected success, expected failure, or unknown from live observations
+- run cheap live assertions at operation completion
+- run heavier checkpoints at quiescent points
 - emit structured logs and a replayable operation transcript
 
 ### Background Workers
@@ -81,8 +76,8 @@ Each worker should have:
 - explicit start/stop operations
 - bounded shutdown logic so failing runs do not leak workload processes
 
-### Generated Operations
-Likely operation enum:
+### Managed Operations
+Likely operation set:
 - `StartWorker(WorkerSpec)`
 - `StopWorker(WorkerId)`
 - `Resize { dev, target, mode }`
@@ -93,21 +88,22 @@ Likely operation enum:
 - `DeleteSnapshot { path }`
 - `Wait { ms }`
 
-The important point is that controller operations stay coarse-grained and semantically meaningful. The generator should not try to produce raw shell commands.
+The important point is that controller operations stay coarse-grained and semantically meaningful. The manager should not devolve into emitting raw shell commands as its primary abstraction.
 
-Generated operations should be actual filesystem mutations, not assertions. Checks such as remounts, offline `fsck`, and usage sampling belong in the assertion/checkpoint layer that runs around selected operations and at case boundaries. Treating those checks as generated transitions muddies the model and weakens shrinking.
+Managed operations should be actual filesystem mutations, not assertions. Checks such as remounts, offline `fsck`, and usage sampling belong in the assertion/checkpoint layer that runs around selected operations and at case boundaries.
 
-### Reference Model
-The model should track only what is needed to generate legal histories and decide when strong assertions are even meaningful:
+### Bookkeeping
+Internal bookkeeping should track only what is needed to launch legal operations and reason about supersession:
 - current member devices and nominal sizes
 - persisted/latest requested resize targets
-- whether the filesystem is mounted
+- which operations are currently in flight
+- which requests have been superseded by newer ones
 - which background workers are running
 - a conservative free-space estimate
 - snapshot count / pinned-space estimate
 - current replication policy
 
-The model should classify requested shrinks into:
+For resize-oracle purposes, requested shrinks should still be classified into:
 - `ClearlyPossible`
 - `ClearlyImpossible`
 - `Unknown`
@@ -127,16 +123,16 @@ After selected operations, and always at the end of a run, check:
 - running workers can be stopped cleanly
 
 Useful checkpoint policy:
-- cheap checks after most controller steps
-- heavier checks after topology changes and at end-of-run
+- cheap live checks at operation completion
+- heavier checks only when the manager has drained in-flight work
 - full `fsck` and remount before declaring success
-- start each generated case from a freshly prepared filesystem state so later cases and proptest shrink reruns do not inherit stale topology or usage state
+- start each case from a freshly prepared filesystem state so later cases do not inherit stale topology or usage state
 
 ## Logging And Replay
 The framework should produce:
 - newline-delimited JSON or similarly structured logs
 - a human-greppable error summary
-- saved `proptest` seed / regression case
+- a deterministic scheduler seed
 - a complete operation transcript
 - per-command stdout/stderr snippets for failures
 
@@ -181,7 +177,7 @@ If needed later, a host-only smoke mode could exist for faster local iteration w
 Initial version:
 - one `.ktest` test case that formats a filesystem, mounts it, and runs the Rust controller once
 - controller starts a small set of background workers
-- generator issues resize and topology operations between checkpoints
+- manager launches resize and topology operations over time, allowing overlap where the oracle can still reason about the result
 - end-of-run always does worker shutdown, unmount, offline `fsck`, and remount
 
 Later extensions:
