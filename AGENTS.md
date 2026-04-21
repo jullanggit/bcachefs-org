@@ -42,6 +42,7 @@ This command runs the test(s) in a loop until interrupted, continuing after fail
 - If a guest-side Rust property test runs multiple `proptest` cases against one filesystem instance, prefer rebuilding a fresh filesystem state per case instead of trying to reset topology in place. That keeps later cases and shrink reruns isolated from stale membership or usage state.
 - The ktest guest root image already includes `cargo`/`rustc`, and `require-make` builds happen inside the guest, so small Rust helper binaries can be added as local `require-make` dependencies instead of needing separate host-side packaging.
 - For continuous topology tests, follow the real device-removal workflow: `bcachefs device evacuate <dev>` first, then `bcachefs device remove ...`. `device remove` is for a fully evacuated member; do not assume it will evacuate live metadata/data on its own.
+- For the first continuous resize operations, stick to a clearly-successful envelope: derive one conservative shrink target per block device from its physical size, and grow back to the full device size. That gives the harness real resize coverage before it has a trustworthy live-space oracle for ambiguous cases.
 #### ssh
 You can run `./build-test-kernel ssh` to ssh into a running test instance and inspect it.
 
