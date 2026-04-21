@@ -30,6 +30,14 @@ That is acceptable here as long as the framework is explicit that:
 - `proptest` explores operation histories
 - background worker timing is treated as a stress dimension, not as a fully modeled state-space dimension
 
+For outcome checking, the better pattern is:
+- snapshot the relevant live filesystem state before each operation
+- derive the expected result from that observation plus the requested operation
+- apply the operation
+- snapshot again and compare against the expected outcome
+
+The model can stay minimal and conservative. It is still useful for generating legal operation sequences, but it should not try to be the primary oracle once free-space, snapshots, or replication semantics become too rich to mirror faithfully.
+
 ## Rust Model Sketch
 The test harness should be a Rust controller with a small state model and a set of long-lived background workers.
 
@@ -76,7 +84,7 @@ The important point is that controller operations stay coarse-grained and semant
 Generated operations should be actual filesystem mutations, not assertions. Checks such as remounts, offline `fsck`, and usage sampling belong in the assertion/checkpoint layer that runs around selected operations and at case boundaries. Treating those checks as generated transitions muddies the model and weakens shrinking.
 
 ### Reference Model
-The model should track only what is needed to decide whether strong assertions are valid:
+The model should track only what is needed to generate legal histories and decide when strong assertions are even meaningful:
 - current member devices and nominal sizes
 - persisted/latest requested resize targets
 - whether the filesystem is mounted
@@ -92,6 +100,8 @@ The model should classify requested shrinks into:
 
 Only the first two classes get hard outcome assertions. The `Unknown` class is still useful for stress, but should not produce false failures.
 
+The same applies to non-resize topology changes. For example, in an initially single-device filesystem, removing the original seed device after later `device add` operations is not obviously in the `ClearlyPossible` bucket just because another member exists. The first implementation should keep remove assertions conservative and only hard-assert cases that are obviously evacuable from the observed state.
+
 ### Invariants And Checkpoints
 After selected operations, and always at the end of a run, check:
 - filesystem is still mountable with the full device set when it should be
@@ -104,7 +114,7 @@ Useful checkpoint policy:
 - cheap checks after most controller steps
 - heavier checks after topology changes and at end-of-run
 - full `fsck` and remount before declaring success
-- restore the starting topology between generated cases so later cases and proptest shrink reruns do not inherit stale device membership
+- start each generated case from a freshly prepared filesystem state so later cases and proptest shrink reruns do not inherit stale topology or usage state
 
 ## Logging And Replay
 The framework should produce:
