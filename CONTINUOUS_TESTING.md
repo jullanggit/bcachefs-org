@@ -115,6 +115,10 @@ Each worker should have:
 - explicit start/stop operations
 - bounded shutdown logic so failing runs do not leak workload processes
 
+Current implementation note:
+- the first worker toggle should be a simple file-churn loop under the mounted filesystem
+- toggles can be manager-immediate operations even if the worker they control runs asynchronously in the background
+
 ### Managed Operations
 Likely operation set:
 - `Resize { dev, target, mode }`
@@ -186,7 +190,7 @@ After selected operations, and always at the end of a run, check:
 
 Useful checkpoint policy:
 - cheap live checks at operation completion
-- heavier checks only when the manager has drained in-flight work
+- heavier checks only when the manager has drained in-flight work and stopped background workers
 - full `fsck` and remount before declaring success
 - start each case from a freshly prepared filesystem state so later cases do not inherit stale topology or usage state
 
