@@ -102,7 +102,7 @@ Only the first two classes get hard outcome assertions. The `Unknown` class is s
 
 The same applies to non-resize topology changes. `bcachefs device remove` is not the operation that evacuates a live member; it removes a member after evacuation has completed. The continuous harness should therefore follow the real workflow for hard-success remove cases: `bcachefs device evacuate <dev>`, wait for it to complete, then `bcachefs device remove ...`. Remove should only be expected to fail once evacuation itself cannot move the remaining state elsewhere.
 
-For the first resize operation set, keep the oracle conservative: on an empty filesystem with no background writers, generate only clearly-successful resizes (for example one fixed shrink target per device derived from the physical block-device size, plus a grow back to full size). That starts exercising online shrink/grow interleavings with add/remove without pretending the harness already has a credible live-space model.
+For the first resize operation set, generate a wider spread of target sizes per device rather than a single shrink point, so the controller exercises more of the online resize surface. Outcome checking can still stay conservative: compare the requested target against the live `Used:` value from `bcachefs fs usage --all`, treat anything within `+-50MB` as ambiguous, and only hard-fail the run when a resize outside that ambiguity band behaves contrary to expectation. Ambiguous resizes should remain in the generated histories even though they do not currently produce pass/fail signals.
 
 ### Invariants And Checkpoints
 After selected operations, and always at the end of a run, check:
