@@ -69,12 +69,11 @@ Likely operation enum:
 - `SetReplication { data, metadata }`
 - `CreateSnapshot { src, dst }`
 - `DeleteSnapshot { path }`
-- `Checkpoint`
-- `Remount`
-- `OfflineFsck`
 - `Wait { ms }`
 
 The important point is that controller operations stay coarse-grained and semantically meaningful. The generator should not try to produce raw shell commands.
+
+Generated operations should be actual filesystem mutations, not assertions. Checks such as remounts, offline `fsck`, and usage sampling belong in the assertion/checkpoint layer that runs around selected operations and at case boundaries. Treating those checks as generated transitions muddies the model and weakens shrinking.
 
 ### Reference Model
 The model should track only what is needed to decide whether strong assertions are valid:
@@ -105,6 +104,7 @@ Useful checkpoint policy:
 - cheap checks after most controller steps
 - heavier checks after topology changes and at end-of-run
 - full `fsck` and remount before declaring success
+- restore the starting topology between generated cases so later cases and proptest shrink reruns do not inherit stale device membership
 
 ## Logging And Replay
 The framework should produce:
