@@ -6,6 +6,20 @@
 - the filesystem should remain mountable and fsck-clean across long mixed-operation runs
 - failures must be replayable from a saved seed plus an operation log
 
+## Overall Goal
+This harness is meant to approximate realistic, and at times deliberately extreme, filesystem usage over extended runs:
+- mixed API usage, not isolated shrink microcases
+- enough surface coverage to exercise real-world interactions and edge cases
+- long enough runtime to catch stateful bugs that do not show up in short directed tests
+
+The intent is for it to become a "last proof of correctness" style test: if this passes, the current shrink behavior is plausibly ready for real-world usage.
+
+That does not mean it can be sloppy about oracles. The harness still needs to be selective about what it fails on, so it does not waste time and compute chasing nondeterministic noise. In practice:
+- keep ambiguous cases for stress coverage
+- only hard-fail on outcomes that are clearly wrong from the observed state
+- prefer conservative assertions that remain stable under long runs and future background workloads
+- record enough context that rare failures are replayable instead of one-off ghosts
+
 ## Proptest Fit
 `proptest` is a good fit for this framework, with one important caveat: it should generate the controller's operation sequence, not try to model the kernel's scheduler.
 
