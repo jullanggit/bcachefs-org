@@ -17,6 +17,7 @@ The spec is generally intended to be descriptive, not prescriptive. Whenever kno
 Use jj for version control, commit whenever you find it appropriate, you can also rewrite the history of your _own_ commits if you find it appropriate.
 Keep the commit title on the first line; put any extended explanation in the commit body after a blank line.
 The kernel source is a separate repo in `bcachefs/`; run `jj` there when checking status or committing kernel changes.
+`ktest/` is also a separate repo; run `jj` in `ktest/` for ktest changes instead of only looking at the outer tree.
 ### bcachefs
 check if it compiles - `make W=1 O=out -j (nproc) fs/bcachefs/`
 ### ketst
@@ -38,6 +39,7 @@ This command runs the test(s) in a loop until interrupted, continuing after fail
 - when adding or changing shrink ktests, prefer an explicit remount after `fsck` with the full member-device list. Resize/shrink changes both allocator state and per-device superblocks, and the remount catches reopen regressions that a clean `fsck` alone can miss.
 - `build-test-kernel -B <dir>` can reuse another kernel `O=` tree, but only when both trees were built under a compatible userspace/toolchain. Mixing build dirs across different devshell/glibc revisions can break host tools such as `objtool` or `extract-cert`; if that happens, fall back to a fresh per-ktest build dir.
 - For larger Rust-based filesystem stress/property tests, keep `ktest` as the outer VM/device harness and run the Rust controller inside the guest from a `.ktest` wrapper. Replacing `ktest` would duplicate scratch-device provisioning, guest lifecycle handling, and log collection.
+- The ktest guest root image already includes `cargo`/`rustc`, and `require-make` builds happen inside the guest, so small Rust helper binaries can be added as local `require-make` dependencies instead of needing separate host-side packaging.
 #### ssh
 You can run `./build-test-kernel ssh` to ssh into a running test instance and inspect it.
 
