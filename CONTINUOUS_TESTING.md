@@ -134,7 +134,7 @@ Likely operation set:
 
 The important point is that controller operations stay coarse-grained and semantically meaningful. The manager should not devolve into emitting raw shell commands as its primary abstraction.
 
-Managed operations should be actual filesystem mutations, not assertions. Checks such as remounts, offline `fsck`, and usage sampling belong in the assertion/checkpoint layer that runs around selected operations and at case boundaries.
+Managed operations should be actual filesystem mutations, not assertions. Checks such as online `fsck`, usage sampling, and any occasional reopen/remount probes belong in the assertion/checkpoint layer that runs around selected operations and at case boundaries.
 
 For the initial design:
 - labels only need to cover `foreground` and `background`
@@ -184,16 +184,16 @@ For the first resize operation set, generate a wider spread of target sizes per 
 
 ### Invariants And Checkpoints
 After selected operations, and always at the end of a run, check:
-- filesystem is still mountable with the full device set when it should be
-- offline `fsck` is clean
+- online `fsck` is clean
 - latest requested resize target converges eventually
 - superseded resize requests do not stall later requests for long
 - running workers can be stopped cleanly
 
 Useful checkpoint policy:
 - cheap live checks at operation completion
-- heavier checks only when the manager has drained in-flight work and stopped background workers
-- full `fsck` and remount before declaring success
+- run online `fsck -n` every fixed number of completed actions
+- `10` completed actions is a reasonable starting cadence; only raise it if the checkpoint itself becomes disproportionately expensive
+- end-of-run checks can still wait for the manager to drain in-flight work and stop background workers
 - start each case from a freshly prepared filesystem state so later cases do not inherit stale topology or usage state
 
 Runtime state generation should mostly happen inside the manager loop, not as a separate startup fixture phase. The same long-running case that resizes and retargets devices should also be able to:
@@ -254,7 +254,8 @@ Initial version:
 - controller randomly chooses a valid format-time profile at startup
 - manager launches resize, topology, label, target, and worker-toggle operations over time
 - overlap is allowed where the oracle can still reason about the result, especially for superseding resizes
-- end-of-run always does worker shutdown, unmount, offline `fsck`, and remount
+- online `fsck -n` runs every fixed number of completed actions without unmounting the filesystem
+- end-of-run does worker shutdown plus final live/quiescent assertions without tearing the case down just to checkpoint it
 
 Later extensions:
 - multiple predefined stress profiles
