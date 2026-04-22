@@ -53,6 +53,7 @@ This command runs the test(s) in a loop until interrupted, continuing after fail
 - The continuous resize oracle also needs the live device bucket size from `bcachefs fs usage --all`: the kernel rejects targets below `BCH_MIN_NR_NBUCKETS * bucket_size`, so those targets must not be classified as clear successes just because `Used:` is small.
 - Keep a little explicit invalid-resize coverage in the continuous harness too: targets below the minimum legal size and above the underlying block-device size should still be generated occasionally and asserted as expected failures, but at lower weight than ordinary legal resize targets.
 - The continuous harness is meant to become an extended-run, realistic mixed-usage "last proof of correctness" test, not just another short directed regression. Keep it broad and aggressive enough to cover real API interactions, but conservative enough in its oracles that it does not burn resources on flaky non-bugs.
+- Device label changes should queue targeted reconcile work: `RECONCILE_SCAN_device` for the relabeled member plus `RECONCILE_SCAN_pending`. Filesystem-wide or metadata-wide scans are broader than necessary and can contend badly with active shrink/reconcile work without improving correctness.
 #### ssh
 You can run `./build-test-kernel ssh` to ssh into a running test instance and inspect it.
 

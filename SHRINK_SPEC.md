@@ -228,6 +228,8 @@ After each snapshot, shrink queues reconcile work with `bch2_dev_shrink_queue_re
 
 The device scan now starts at `target_nbuckets`, not at bucket zero. That avoids needlessly requeuing metadata below the retained region.
 
+Unrelated device-label changes should also stay targeted while shrink is active. They only need a `RECONCILE_SCAN_device` for the relabeled member plus `RECONCILE_SCAN_pending`; escalating them to filesystem-wide or metadata-wide scans is broader than necessary and can contend badly with shrink's own reconcile/allocator work.
+
 #### Waiting strategy
 
 `bch2_dev_shrink_wait_reconcile()` does not simply wait for the entire reconcile kick to drain. Instead it:
