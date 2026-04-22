@@ -194,6 +194,7 @@ Useful checkpoint policy:
 - run online `fsck -n` every fixed number of completed actions
 - `10` completed actions is a reasonable starting cadence; only raise it if the checkpoint itself becomes disproportionately expensive
 - end-of-run checks can still wait for the manager to drain in-flight work and stop background workers
+- the harness should treat the filesystem being unexpectedly unmounted as an immediate failure condition, not as a modeled runtime state
 - start each case from a freshly prepared filesystem state so later cases do not inherit stale topology or usage state
 
 Runtime state generation should mostly happen inside the manager loop, not as a separate startup fixture phase. The same long-running case that resizes and retargets devices should also be able to:
