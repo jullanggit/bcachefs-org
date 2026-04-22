@@ -182,9 +182,19 @@ Only the first two classes get hard outcome assertions. The `Unknown` class is s
 
 The same applies to non-resize topology changes. `bcachefs device remove` is not the operation that evacuates a live member; it removes a member after evacuation has completed. The continuous harness should therefore follow the real workflow for hard-success remove cases: `bcachefs device evacuate <dev>`, wait for it to complete, then `bcachefs device remove ...`. Remove should only be expected to fail once evacuation itself cannot move the remaining state elsewhere.
 
+Once the harness starts exercising live labels, target changes, and background workers, `RemoveDevice` also stops being a generally clear-success case. Under those more exotic runtime configurations the harness should still keep remove in the mix, but it should treat the exact success/failure outcome as ambiguous unless the current state is simple enough to reason about confidently.
+
+In those ambiguous remove cases, the failure path should only be checked for safety/invariants. Do not over-assert the exact observed topology after a failed remove attempt, because the live filesystem may already have entered transitional read-only or evacuating states that are visible in `fs usage` with unstable device naming.
+
 For the first resize operation set, generate a wider spread of target sizes per device rather than a single shrink point, so the controller exercises more of the online resize surface. Outcome checking can still stay conservative: compare the requested target against the live `Used:` value from `bcachefs fs usage --all`, treat anything within `+-50MB` as ambiguous, and only hard-fail the run when a resize outside that ambiguity band behaves contrary to expectation. Ambiguous resizes should remain in the generated histories even though they do not currently produce pass/fail signals.
 
 The resize oracle also has to respect the kernel's minimum legal target size for a member. That floor depends on the live device bucket size (`BCH_MIN_NR_NBUCKETS * bucket_size`), so the harness should observe bucket size from `bcachefs fs usage --all` and avoid classifying sub-minimum targets as obvious successes.
+
+Those clearly-invalid targets are still worth exercising. The harness should occasionally issue:
+- a target below the minimum legal size for the member
+- a target above the underlying block-device size
+
+Both should be treated as expected failures, but with lower selection weight than ordinary legal resize targets so they do not dominate the more interesting live-reconcile cases.
 
 ### Invariants And Checkpoints
 After selected operations, and always at the end of a run, check:
@@ -196,7 +206,7 @@ After selected operations, and always at the end of a run, check:
 Useful checkpoint policy:
 - cheap live checks at operation completion
 - run online `fsck -n` every fixed number of completed actions
-- `10` completed actions is a reasonable starting cadence; only raise it if the checkpoint itself becomes disproportionately expensive
+- `10` completed actions is a reasonable starting cadence; if online `fsck` is too noisy under active churn, defer the check until the next quiescent point rather than running it against a filesystem that is still being actively mutated
 - end-of-run checks can still wait for the manager to drain in-flight work and stop background workers
 - the harness should treat the filesystem being unexpectedly unmounted as an immediate failure condition, not as a modeled runtime state
 - start each case from a freshly prepared filesystem state so later cases do not inherit stale topology or usage state
