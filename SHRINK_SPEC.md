@@ -127,6 +127,7 @@ Current hooks are:
 - `bcachefs/fs/bcachefs/data/reconcile/work.c`
   - device reconcile scans start at the shrink cutoff in backpointer key space instead of rescanning the whole device.
     - TODO: see if this is too general. It should only affect scans triggered by shrink, not all scans. This might or might not be an issue.
+  - while scanning a shrinking device tail, reconcile drops cached extent pointers it finds in that tail so cached-only backpointers do not keep the tail artificially non-empty.
 
 Those checks are what make the shrink cutoff effective as soon as the request is persisted. They also mean retargeting away from shrink must flip behavior immediately via the normalized helpers.
 
@@ -208,16 +209,13 @@ The loop first does a cheap head snapshot. If the tail looks empty, it flushes t
 
 #### Cached-only tail invalidation
 
-`bch2_dev_shrink_invalidate_tail_cached()` handles a specific false-blocker case:
+Cached-only blockers in the shrink tail are now handled by reconcile’s device-backpointer scan path itself.
 
-- live data may already have been rewritten elsewhere
-- the old tail buckets may remain only as cached copies
-- those cached copies still keep backpointers alive
-- reconcile does not need to move them again
+When reconcile runs a `RECONCILE_SCAN_device` for a shrinking member, it already starts scanning at the shrink cutoff in backpointer key space. In that same shrink-tail context, reconcile now treats extent backpointers that resolve to cached extent pointers as stale blockers and invalidates those pointers directly during the scan. This keeps cached copies in the truncating tail from surviving as false blockers that prevent shrink progress.
 
-The helper scans alloc keys in the tail for cached buckets that are not currently open, then invalidates the matching backpointers directly. This lets shrink wait only on durable data and metadata that still genuinely pins the tail.
+This replaces the old manual shrink-side pass (`bch2_dev_shrink_invalidate_tail_cached()`) that scanned alloc keys and invalidated matching cached backpointers before the main shrink/reconcile loop.
 
-TODO: maybe the reconcile helper that actually moves the data can be changed to not leave behind cached copies on move, if they are in the tail.
+The practical effect is that shrink no longer needs a separate one-shot cached-tail cleanup phase up front: cached-tail cleanup is folded into normal reconcile work on the shrink tail, so shrink waits only on durable data and metadata that still genuinely pins the truncated region.
 
 #### Reconcile kick
 
